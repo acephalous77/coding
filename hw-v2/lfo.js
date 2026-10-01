@@ -113,6 +113,14 @@ export class LFOEngine {
     return lfo ? lfo._currentValue : 0;
   }
 
+  // Park every LFO target at its center value. Called on stop/panic so CC
+  // targets are never left wherever the last cycle happened to die.
+  parkAtCenter() {
+    this.lfos.forEach((l) => {
+      this.midi.cc(l.channel, l.ccNumber, clamp7(l.center));
+    });
+  }
+
   getLFOs() {
     return Array.from(this.lfos.values()).map((l) => {
       const c = Object.assign({}, l);

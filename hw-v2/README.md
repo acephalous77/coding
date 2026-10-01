@@ -11,17 +11,18 @@ Companion to v1 (`hw-707-control.html`) — the v2 header links to it. v1 is not
 modified by v2. Tone/patch/effect editing is B67's domain and is intentionally
 absent here.
 
-## MIDI routing (three ports)
+## MIDI routing (four ports)
 
 | Header selector | Cable | Purpose |
 |---|---|---|
-| `OUT` | 707 USB | app → 707 (CC, PC, transport) and harmony notes |
+| `OUT` | 707 USB | app → 707 (CC, PC, transport); harmony notes too while HARM OUT is unset |
 | `CLOCK IN` | 707 USB | 707 → app, MIDI clock for slave mode |
 | `KEYS IN` | Keystep USB | Keystep → app, note input for follow mode |
+| `HARM OUT` | VT-4 USB | app → VT-4 directly, harmony notes. "— follow OUT —" routes them via the main OUT (707 DIN OUT2 path) instead |
 
 Hardware (707 owns tempo): `707 MIDI OUT1 → Keystep MIDI IN` (clock),
 `Keystep MIDI OUT → 707 MIDI IN` (notes/arp), `707 MIDI OUT2 → VT-4 MIDI IN`
-(harmony). Ports auto-detect by name on launch (Roland/707, Arturia/Keystep);
+(harmony). Ports auto-detect by name on launch (Roland/707, Arturia/Keystep, VT-4 for HARM OUT);
 override from the dropdowns.
 
 ## Harmony modes

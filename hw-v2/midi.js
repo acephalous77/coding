@@ -26,6 +26,8 @@ export class MidiEngine {
   constructor() {
     this.access = null;
     this.output = null;
+    // Second output for harmony notes (VT-4 USB). Null = follow the main output.
+    this.harmonyOutput = null;
     // Two independent inputs, kept separate so clock and note streams never
     // interfere: clock comes from the 707, notes come from the Keystep.
     this.clockInput = null;
@@ -87,6 +89,16 @@ export class MidiEngine {
     return this.output ? this.output.id : null;
   }
 
+  // --- Harmony output (VT-4 USB) --- second output; falls back to OUT when unset.
+  setHarmonyOutputPort(id) {
+    if (!this.access) return;
+    this.harmonyOutput = id ? this.access.outputs.get(id) || null : null;
+  }
+
+  getHarmonyOutputPortId() {
+    return this.harmonyOutput ? this.harmonyOutput.id : null;
+  }
+
   // --- Clock input (707 USB) — for ClockEngine slave mode ---
   setClockInputPort(id) {
     if (!this.access) return;
@@ -145,10 +157,14 @@ export class MidiEngine {
     const ins = this.getInputPorts();
     const roland = /mc-?707|roland/i;
     const arturia = /keystep|arturia/i;
+    const vt4 = /vt-?4/i;
+    const tr6s = /tr-?6s/i;
     const out = (outs.find((p) => roland.test(p.name)) || outs[0] || {}).id || null;
     const clockIn = (ins.find((p) => roland.test(p.name)) || {}).id || null;
     const keysIn = (ins.find((p) => arturia.test(p.name)) || {}).id || null;
-    return { out, clockIn, keysIn };
+    const harmOut = (outs.find((p) => vt4.test(p.name)) || {}).id || null;
+    const auxOut = (outs.find((p) => tr6s.test(p.name) && !/ctrl/i.test(p.name)) || {}).id || null;
+    return { out, clockIn, keysIn, harmOut, auxOut };
   }
 
   // --- Activity flash registration ---
@@ -168,6 +184,38 @@ export class MidiEngine {
     this._flash('out');
     return true;
   }
+
+  // Harmony-path send: dedicated port when set, otherwise the main output.
+  sendHarmony(bytes) {
+    const port = this.harmonyOutput || this.output;
+    if (!port) return false;
+    port.send(bytes);
+    this._flash('out');
+    return true;
+  }
+
+  harmonyNoteOn(ch, note, vel) {
+    this.sendHarmony([NOTE_ON | chNibble(ch), clamp7(note), clamp7(vel)]);
+  }
+
+  harmonyNoteOff(ch, note) {
+    this.sendHarmony([NOTE_OFF | chNibble(ch), clamp7(note), 0]);
+  }
+
+  // --- Generic per-port sends (Quick Deck) ---
+  sendTo(portId, bytes) {
+    if (!this.access || !portId) return false;
+    const port = this.access.outputs.get(portId);
+    if (!port) return false;
+    port.send(bytes);
+    this._flash('out');
+    return true;
+  }
+
+  noteOnTo(portId, ch, note, vel) { this.sendTo(portId, [NOTE_ON | chNibble(ch), clamp7(note), clamp7(vel)]); }
+  noteOffTo(portId, ch, note) { this.sendTo(portId, [NOTE_OFF | chNibble(ch), clamp7(note), 0]); }
+  ccTo(portId, ch, number, value) { this.sendTo(portId, [CONTROL_CHANGE | chNibble(ch), clamp7(number), clamp7(value)]); }
+  pcTo(portId, ch, program) { this.sendTo(portId, [PROGRAM_CHANGE | chNibble(ch), clamp7(program)]); }
 
   noteOn(ch, note, vel) {
     this.send([NOTE_ON | chNibble(ch), clamp7(note), clamp7(vel)]);
@@ -193,9 +241,15 @@ export class MidiEngine {
   // Panic helpers — used on stop, mode switch, port change.
   allNotesOff() {
     for (let ch = 1; ch <= 16; ch++) this.cc(ch, 123, 0);
+    if (this.harmonyOutput && this.harmonyOutput !== this.output) {
+      for (let ch = 1; ch <= 16; ch++) this.sendHarmony([CONTROL_CHANGE | chNibble(ch), 123, 0]);
+    }
   }
 
   allSoundOff() {
     for (let ch = 1; ch <= 16; ch++) this.cc(ch, 120, 0);
+    if (this.harmonyOutput && this.harmonyOutput !== this.output) {
+      for (let ch = 1; ch <= 16; ch++) this.sendHarmony([CONTROL_CHANGE | chNibble(ch), 120, 0]);
+    }
   }
 }

@@ -435,3 +435,46 @@ footer {
   padding: 16px; color: var(--faint); font-size: 11px;
   border-top: 1px solid var(--line);
 }
+
+/* ===== Quick Deck ===== */
+.quick-deck {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 10px;
+  margin: 10px 14px 0;
+}
+.deck-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.deck-card.amber-card { border-left: 3px solid var(--h); }
+.deck-card.teal-card  { border-left: 3px solid var(--w); }
+.deck-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.deck-head h2 { margin: 0; font-size: 0.95rem; letter-spacing: 0.06em; }
+.deck-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.deck-row label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.deck-row .pad {
+  min-width: 44px;
+  padding: 10px 8px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+.deck-row .trk { min-width: 34px; }
+#qVtScenes button { min-width: 30px; }
+
+/* ===== Listener ===== */
+.ls-meter {
+  width: 160px; height: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.ls-meter-fill {
+  height: 100%; width: 0%;
+  background: var(--w);
+  transition: width 60ms linear;
+}
+.ls-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; }
+#lsState.voiced { color: var(--w); }

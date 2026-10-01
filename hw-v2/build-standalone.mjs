@@ -14,7 +14,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const read = (f) => readFileSync(join(here, f), 'utf8');
 
 // Modules in dependency order; entry last.
-const MODULES = ['midi.js', 'clock.js', 'euclidean.js', 'lfo.js', 'harmony.js'];
+const MODULES = ['midi.js', 'clock.js', 'euclidean.js', 'lfo.js', 'harmony.js', 'listener.js'];
 const ENTRY = 'ui.js';
 
 // Collect `export class/function/const NAME` identifiers from a source.

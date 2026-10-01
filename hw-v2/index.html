@@ -35,6 +35,10 @@
         <select id="keysInPort" title="Keystep USB input — follow mode"><option value="">— none —</option></select>
       </div>
       <div class="grp">
+        <label>Harm out</label>
+        <select id="harmOutPort" title="VT-4 USB output — harmony notes. — follow OUT — sends them with the main output instead"><option value="">— follow OUT —</option></select>
+      </div>
+      <div class="grp">
         <span id="statusDot" class="status-dot" title="MIDI status"></span>
         <span id="statusText" class="muted">init…</span>
       </div>
@@ -70,6 +74,91 @@
       </div>
     </div>
   </header>
+
+  <!-- ============ QUICK DECK — one-click controls per device ============ -->
+  <section class="quick-deck" id="quickDeck">
+    <div class="deck-card amber-card">
+      <div class="deck-head"><h2>MC-707</h2><span class="faint mono">main out · ch1-8</span></div>
+      <div class="deck-row">
+        <button id="qOpenAll" class="amber-btn" title="CC74=100 + CC80=64 on ch 1-8 — un-choke every track">open all</button>
+        <button id="qDarkAll" class="amber-btn" title="CC74=30 on ch 1-8 — pull everything dark">dark all</button>
+        <button id="q707Calm" class="warn" title="All notes off + all sound off">calm</button>
+      </div>
+      <div class="deck-row">
+        <label>Scene</label>
+        <button id="qScenePrev">−</button>
+        <span id="qSceneNum" class="mono">1</span>
+        <button id="qSceneNext">+</button>
+        <span class="faint">PC → ch16</span>
+      </div>
+      <div class="deck-row" id="qTrackRow"></div>
+    </div>
+    <div class="deck-card">
+      <div class="deck-head"><h2>TR-6S</h2>
+        <select id="qTrPort" title="TR-6S USB output port"><option value="">— none —</option></select>
+        <select id="qTrCh" title="TR-6S MIDI channel — default 10; verify on the box under UTILITY → MIDI"></select>
+      </div>
+      <div class="deck-row" id="qPadRow"></div>
+      <div class="deck-row">
+        <label>Kit</label>
+        <button id="qKitPrev">−</button>
+        <span id="qKitNum" class="mono">1</span>
+        <button id="qKitNext">+</button>
+        <span class="faint">PC 0-127 — official map</span>
+      </div>
+    </div>
+    <div class="deck-card teal-card">
+      <div class="deck-head"><h2>VT-4</h2><span class="faint mono">harm out path</span></div>
+      <div class="deck-row">
+        <label>Context</label>
+        <select id="qVtRoot"></select>
+        <select id="qVtQual"></select>
+        <button id="qVtSend" class="teal-btn" title="Hold this chord as the VT-4's harmonic context">set</button>
+        <button id="qVtClear" class="teal-btn" title="Release held context notes">clear</button>
+      </div>
+      <div class="deck-row">
+        <label>Scene</label>
+        <span id="qVtScenes"></span>
+        <span class="faint" title="PC 1-8 as scene recall is unconfirmed on the VT-4 — press one and watch the box; harmless if it ignores them">verify once</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LISTENER — breath-clock, first testable unit of v3 ============ -->
+  <section class="quick-deck" id="listenerDeck">
+    <div class="deck-card teal-card" style="grid-column: 1 / -1;">
+      <div class="deck-head">
+        <h2>LISTENER · breath-clock</h2>
+        <span class="faint mono">v3 unit 1 — needs http://localhost (Chrome blocks mic on file://)</span>
+      </div>
+      <div class="deck-row">
+        <button id="lsArm" class="teal-btn">arm</button>
+        <select id="lsDevice" title="Audio input — pick the VT-4"><option value="">default input</option></select>
+        <span id="lsState" class="mono faint">silent</span>
+        <div class="ls-meter"><div id="lsMeterFill" class="ls-meter-fill"></div></div>
+        <span id="lsDb" class="mono faint">−∞</span>
+      </div>
+      <div class="deck-row">
+        <label>Thresh</label>
+        <input type="range" id="lsThresh" min="-60" max="-20" value="-42" />
+        <span id="lsThreshVal" class="mono faint">-42dB</span>
+        <label>Breath gap</label>
+        <input type="range" id="lsSilence" min="150" max="1500" step="25" value="450" />
+        <span id="lsSilenceVal" class="mono faint">450ms</span>
+      </div>
+      <div class="deck-row">
+        <label class="ls-toggle"><input type="checkbox" id="lsAdvance" /> breaths advance harmony</label>
+        <span class="faint">phrase → next chord (any mode)</span>
+      </div>
+      <div class="deck-row">
+        <span class="mono">phrases <span id="lsPhrases">0</span></span>
+        <span class="mono">rate <span id="lsRate">0.0</span>/min</span>
+        <button id="lsMisfire" class="warn" title="Press when it advanced on something that was NOT a breath — the falsifier counts">log misfire</button>
+        <span class="mono">misfires <span id="lsMisfires">0</span> (<span id="lsMisRate">0.0</span>/min)</span>
+      </div>
+      <div class="deck-row faint" id="lsNote">falsifier: over 1 misfire/min at rehearsal level kills the mode — registered 2026-08-17</div>
+    </div>
+  </section>
 
   <!-- ============ FILE:// MODULE-LOAD FALLBACK ============ -->
   <!-- Chrome blocks ES module imports from file:// (CORS, origin 'null'), which

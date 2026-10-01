@@ -253,7 +253,7 @@ export class HarmonyEngine {
 
     if (changed) {
       this._releaseActive();
-      notes.forEach((n) => this.midi.noteOn(this.channel, n, 100));
+      notes.forEach((n) => this.midi.harmonyNoteOn(this.channel, n, 100));
       this._activeNotes = notes;
       this._lastDetected = { root: detected.root, quality: detected.quality };
       this._followChordCallbacks.forEach((cb) =>
@@ -373,7 +373,7 @@ export class HarmonyEngine {
     this._releaseActive();
 
     const notes = this.computeNotes(step.root, step.quality);
-    notes.forEach((n) => this.midi.noteOn(this.channel, n, 100));
+    notes.forEach((n) => this.midi.harmonyNoteOn(this.channel, n, 100));
     this._activeNotes = notes;
 
     this._barsRemaining = step.bars;
@@ -387,7 +387,7 @@ export class HarmonyEngine {
   }
 
   _releaseActive() {
-    this._activeNotes.forEach((n) => this.midi.noteOff(this.channel, n));
+    this._activeNotes.forEach((n) => this.midi.harmonyNoteOff(this.channel, n));
     this._activeNotes = [];
   }
 

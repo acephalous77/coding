@@ -1,6 +1,7 @@
 // ui.js — wires all modules to the DOM. Owns no musical logic.
 
 import { MidiEngine } from './midi.js';
+import { VoiceListener } from './listener.js';
 import { ClockEngine } from './clock.js';
 import { EuclideanEngine } from './euclidean.js';
 import { LFOEngine } from './lfo.js';
@@ -51,6 +52,8 @@ function saveState() {
       outputPortId: midi.getOutputPortId(),
       clockInputPortId: midi.getClockInputPortId(),
       keyboardInputPortId: midi.getKeyboardInputPortId(),
+      harmonyOutputPortId: midi.getHarmonyOutputPortId(),
+      auxOutputPortId: ($('qTrPort') && $('qTrPort').value) || null,
     },
     euclidean: { voices: euclid.getVoices() },
     lfo: { lfos: lfo.getLFOs() },
@@ -130,6 +133,8 @@ function populatePorts() {
   fillPortSelect($('outPort'), outs, midi.getOutputPortId());
   fillPortSelect($('clockInPort'), ins, midi.getClockInputPortId());
   fillPortSelect($('keysInPort'), ins, midi.getKeyboardInputPortId());
+  fillPortSelect($('harmOutPort'), outs, midi.getHarmonyOutputPortId());
+  fillPortSelect($('qTrPort'), outs, ($('qTrPort') && $('qTrPort').value) || null);
 }
 
 async function initMidi() {
@@ -163,6 +168,12 @@ function wireTransport() {
   });
   $('keysInPort').addEventListener('change', (e) => {
     midi.setKeyboardInputPort(e.target.value);
+    scheduleSave();
+  });
+  $('harmOutPort').addEventListener('change', (e) => {
+    // Release notes before swapping ports to avoid orphans.
+    panic();
+    midi.setHarmonyOutputPort(e.target.value);
     scheduleSave();
   });
 
@@ -213,17 +224,198 @@ function wireTransport() {
   });
 }
 
+// =====================================================================
+//  QUICK DECK — one-click controls for MC-707 / TR-6S / VT-4
+// =====================================================================
+
+let qScene = 1;
+let qKit = 1;
+let qVtHeld = [];
+
+function wireQuickDeck() {
+  // --- MC-707 (main out) ---
+  const open707 = () => { for (let ch = 1; ch <= 8; ch++) { midi.cc(ch, 74, 100); midi.cc(ch, 80, 64); } };
+  $('qOpenAll').addEventListener('click', () => { open707(); setTrackRow(true); });
+  $('qDarkAll').addEventListener('click', () => { for (let ch = 1; ch <= 8; ch++) midi.cc(ch, 74, 30); setTrackRow(false); });
+  $('q707Calm').addEventListener('click', () => { midi.allNotesOff(); midi.allSoundOff(); });
+
+  const sendScene = () => { $('qSceneNum').textContent = qScene; midi.pc(16, qScene - 1); };
+  $('qScenePrev').addEventListener('click', () => { qScene = Math.max(1, qScene - 1); sendScene(); });
+  $('qSceneNext').addEventListener('click', () => { qScene = Math.min(16, qScene + 1); sendScene(); });
+
+  // per-track cutoff toggles: lit = open (CC74=100), unlit = dark (CC74=34)
+  const row = $('qTrackRow');
+  for (let ch = 1; ch <= 8; ch++) {
+    const b = document.createElement('button');
+    b.textContent = ch;
+    b.className = 'trk amber-btn toggle on';
+    b.title = 'Track ' + ch + ' cutoff: lit = open, unlit = dark';
+    b.addEventListener('click', () => {
+      const on = !b.classList.contains('on');
+      b.classList.toggle('on', on);
+      midi.cc(ch, 74, on ? 100 : 34);
+    });
+    row.appendChild(b);
+  }
+  function setTrackRow(on) {
+    row.querySelectorAll('button').forEach((b) => b.classList.toggle('on', on));
+  }
+
+  // --- TR-6S (own port select) ---
+  const trCh = $('qTrCh');
+  for (let c = 1; c <= 16; c++) {
+    const o = document.createElement('option');
+    o.value = c; o.textContent = 'ch' + c;
+    if (c === 10) o.selected = true;
+    trCh.appendChild(o);
+  }
+  $('qTrPort').addEventListener('change', scheduleSave);
+  trCh.addEventListener('change', scheduleSave);
+  const trPort = () => $('qTrPort').value;
+  const trChan = () => parseInt(trCh.value, 10) || 10;
+
+  // official TR-6S note map (Roland PDF): BD36 SD38 LT43 HC39 CH42 OH46
+  const PADS = [['BD', 36], ['SD', 38], ['LT', 43], ['HC', 39], ['CH', 42], ['OH', 46]];
+  const padRow = $('qPadRow');
+  PADS.forEach(([name, note]) => {
+    const b = document.createElement('button');
+    b.textContent = name;
+    b.className = 'pad';
+    b.title = name + ' — note ' + note;
+    b.addEventListener('mousedown', () => {
+      midi.noteOnTo(trPort(), trChan(), note, 112);
+      setTimeout(() => midi.noteOffTo(trPort(), trChan(), note), 120);
+    });
+    padRow.appendChild(b);
+  });
+
+  const sendKit = () => { $('qKitNum').textContent = qKit; midi.pcTo(trPort(), trChan(), qKit - 1); };
+  $('qKitPrev').addEventListener('click', () => { qKit = Math.max(1, qKit - 1); sendKit(); });
+  $('qKitNext').addEventListener('click', () => { qKit = Math.min(128, qKit + 1); sendKit(); });
+
+  // --- VT-4 (harmony path: dedicated port when set, else main out) ---
+  const cloneOpts = () => {
+    if ($('stepRoot').options.length && !$('qVtRoot').options.length) {
+      $('qVtRoot').innerHTML = $('stepRoot').innerHTML;
+      $('qVtQual').innerHTML = $('stepQuality').innerHTML;
+    }
+  };
+  cloneOpts();
+  setTimeout(cloneOpts, 400); // harmony UI may populate after us
+
+  const vtRelease = () => { qVtHeld.forEach((n) => midi.harmonyNoteOff(harmony.channel, n)); qVtHeld = []; };
+  $('qVtSend').addEventListener('click', () => {
+    cloneOpts();
+    vtRelease();
+    const notes = harmony.computeNotes($('qVtRoot').value, $('qVtQual').value);
+    notes.forEach((n) => midi.harmonyNoteOn(harmony.channel, n, 100));
+    qVtHeld = notes;
+  });
+  $('qVtClear').addEventListener('click', vtRelease);
+
+  const vtPort = () => midi.getHarmonyOutputPortId() || midi.getOutputPortId();
+  const scen = $('qVtScenes');
+  for (let s = 1; s <= 8; s++) {
+    const b = document.createElement('button');
+    b.textContent = s;
+    b.className = 'teal-btn';
+    b.title = 'VT-4 scene ' + s + ' via PC — unconfirmed, verify once on the box';
+    b.addEventListener('click', () => midi.pcTo(vtPort(), harmony.channel, s - 1));
+    scen.appendChild(b);
+  }
+}
+
+// =====================================================================
+//  LISTENER — breath-clock (v3 unit 1)
+// =====================================================================
+
+const listener = new VoiceListener();
+let lsPhrases = 0;
+let lsMisfires = 0;
+let lsArmedAt = 0;
+
+function wireListener() {
+  const fmt = (n) => n.toFixed(1);
+  const mins = () => Math.max((performance.now() - lsArmedAt) / 60000, 1 / 60);
+
+  listener.onLevel((db) => {
+    const pct = Math.max(0, Math.min(100, (db + 60) / 40 * 100));
+    $('lsMeterFill').style.width = pct + '%';
+    $('lsDb').textContent = db <= -99 ? '−∞' : Math.round(db) + 'dB';
+  });
+  listener.onState((v) => {
+    $('lsState').textContent = v ? 'VOICE' : 'silent';
+    $('lsState').classList.toggle('voiced', v);
+  });
+  listener.onPhrase((p) => {
+    lsPhrases += 1;
+    $('lsPhrases').textContent = lsPhrases;
+    $('lsRate').textContent = fmt(lsPhrases / mins());
+    if ($('lsAdvance').checked) {
+      harmony.jumpToStep(harmony._stepIndex + 1);
+    }
+  });
+
+  $('lsArm').addEventListener('click', async () => {
+    if (listener.running) {
+      listener.disarm();
+      $('lsArm').textContent = 'arm';
+      $('lsArm').classList.remove('on');
+      return;
+    }
+    try {
+      await listener.arm($('lsDevice').value || undefined);
+      lsArmedAt = performance.now();
+      lsPhrases = 0; lsMisfires = 0;
+      $('lsPhrases').textContent = '0'; $('lsMisfires').textContent = '0';
+      $('lsArm').textContent = 'disarm';
+      $('lsArm').classList.add('on');
+      $('lsNote').textContent = 'armed — falsifier: over 1 misfire/min at rehearsal level kills the mode';
+      // Labels appear only after permission; refresh and prefer the VT-4.
+      const devs = await listener.listDevices();
+      const sel = $('lsDevice');
+      const keep = sel.value;
+      sel.innerHTML = '<option value="">default input</option>';
+      devs.forEach((d) => {
+        const o = document.createElement('option');
+        o.value = d.id; o.textContent = d.label;
+        sel.appendChild(o);
+      });
+      const vt = devs.find((d) => /vt-?4/i.test(d.label));
+      sel.value = keep || (vt ? vt.id : '');
+    } catch (err) {
+      $('lsNote').textContent = 'arm failed: ' + err.message;
+    }
+  });
+
+  $('lsThresh').addEventListener('input', (e) => {
+    listener.thresholdDb = parseInt(e.target.value, 10);
+    $('lsThreshVal').textContent = e.target.value + 'dB';
+  });
+  $('lsSilence').addEventListener('input', (e) => {
+    listener.minSilenceMs = parseInt(e.target.value, 10);
+    $('lsSilenceVal').textContent = e.target.value + 'ms';
+  });
+  $('lsMisfire').addEventListener('click', () => {
+    lsMisfires += 1;
+    $('lsMisfires').textContent = lsMisfires;
+    $('lsMisRate').textContent = fmt(lsMisfires / mins());
+  });
+}
+
 function stopAll() {
   clock.stop();
   if (clock.mode === 'internal') midi.rt(0xfc);
   euclid.releaseAll();
   harmony.stopProgression();
+  lfo.parkAtCenter();
   midi.allNotesOff();
 }
 
 function panic() {
   euclid.releaseAll();
   harmony.releaseAll();
+  lfo.parkAtCenter();
   midi.allNotesOff();
   midi.allSoundOff();
 }
@@ -903,6 +1095,8 @@ async function boot() {
   const state = loadState();
 
   wireTransport();
+  wireQuickDeck();
+  wireListener();
   wireHarmony();
 
   if (state) {
@@ -960,9 +1154,13 @@ async function boot() {
     const outId = sm.outputPortId || guess.out;
     const clkId = sm.clockInputPortId || guess.clockIn;
     const keysId = sm.keyboardInputPortId || guess.keysIn;
+    const harmId = sm.harmonyOutputPortId || guess.harmOut;
+    const auxId = sm.auxOutputPortId || guess.auxOut;
     if (outId) { midi.setOutputPort(outId); $('outPort').value = outId; }
     if (clkId) { midi.setClockInputPort(clkId); $('clockInPort').value = clkId; }
     if (keysId) { midi.setKeyboardInputPort(keysId); $('keysInPort').value = keysId; }
+    if (harmId) { midi.setHarmonyOutputPort(harmId); $('harmOutPort').value = harmId; }
+    if (auxId) { $('qTrPort').value = auxId; }
   }
 
   // Slave-mode disables BPM input.

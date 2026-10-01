@@ -449,6 +449,49 @@ footer {
   border-top: 1px solid var(--line);
 }
 
+/* ===== Quick Deck ===== */
+.quick-deck {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 10px;
+  margin: 10px 14px 0;
+}
+.deck-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.deck-card.amber-card { border-left: 3px solid var(--h); }
+.deck-card.teal-card  { border-left: 3px solid var(--w); }
+.deck-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.deck-head h2 { margin: 0; font-size: 0.95rem; letter-spacing: 0.06em; }
+.deck-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.deck-row label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.deck-row .pad {
+  min-width: 44px;
+  padding: 10px 8px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+.deck-row .trk { min-width: 34px; }
+#qVtScenes button { min-width: 30px; }
+
+/* ===== Listener ===== */
+.ls-meter {
+  width: 160px; height: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.ls-meter-fill {
+  height: 100%; width: 0%;
+  background: var(--w);
+  transition: width 60ms linear;
+}
+.ls-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; }
+#lsState.voiced { color: var(--w); }
+
 </style>
 </head>
 <body>
@@ -472,6 +515,10 @@ footer {
       <div class="grp">
         <label>Keys in</label>
         <select id="keysInPort" title="Keystep USB input — follow mode"><option value="">— none —</option></select>
+      </div>
+      <div class="grp">
+        <label>Harm out</label>
+        <select id="harmOutPort" title="VT-4 USB output — harmony notes. — follow OUT — sends them with the main output instead"><option value="">— follow OUT —</option></select>
       </div>
       <div class="grp">
         <span id="statusDot" class="status-dot" title="MIDI status"></span>
@@ -509,6 +556,91 @@ footer {
       </div>
     </div>
   </header>
+
+  <!-- ============ QUICK DECK — one-click controls per device ============ -->
+  <section class="quick-deck" id="quickDeck">
+    <div class="deck-card amber-card">
+      <div class="deck-head"><h2>MC-707</h2><span class="faint mono">main out · ch1-8</span></div>
+      <div class="deck-row">
+        <button id="qOpenAll" class="amber-btn" title="CC74=100 + CC80=64 on ch 1-8 — un-choke every track">open all</button>
+        <button id="qDarkAll" class="amber-btn" title="CC74=30 on ch 1-8 — pull everything dark">dark all</button>
+        <button id="q707Calm" class="warn" title="All notes off + all sound off">calm</button>
+      </div>
+      <div class="deck-row">
+        <label>Scene</label>
+        <button id="qScenePrev">−</button>
+        <span id="qSceneNum" class="mono">1</span>
+        <button id="qSceneNext">+</button>
+        <span class="faint">PC → ch16</span>
+      </div>
+      <div class="deck-row" id="qTrackRow"></div>
+    </div>
+    <div class="deck-card">
+      <div class="deck-head"><h2>TR-6S</h2>
+        <select id="qTrPort" title="TR-6S USB output port"><option value="">— none —</option></select>
+        <select id="qTrCh" title="TR-6S MIDI channel — default 10; verify on the box under UTILITY → MIDI"></select>
+      </div>
+      <div class="deck-row" id="qPadRow"></div>
+      <div class="deck-row">
+        <label>Kit</label>
+        <button id="qKitPrev">−</button>
+        <span id="qKitNum" class="mono">1</span>
+        <button id="qKitNext">+</button>
+        <span class="faint">PC 0-127 — official map</span>
+      </div>
+    </div>
+    <div class="deck-card teal-card">
+      <div class="deck-head"><h2>VT-4</h2><span class="faint mono">harm out path</span></div>
+      <div class="deck-row">
+        <label>Context</label>
+        <select id="qVtRoot"></select>
+        <select id="qVtQual"></select>
+        <button id="qVtSend" class="teal-btn" title="Hold this chord as the VT-4's harmonic context">set</button>
+        <button id="qVtClear" class="teal-btn" title="Release held context notes">clear</button>
+      </div>
+      <div class="deck-row">
+        <label>Scene</label>
+        <span id="qVtScenes"></span>
+        <span class="faint" title="PC 1-8 as scene recall is unconfirmed on the VT-4 — press one and watch the box; harmless if it ignores them">verify once</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LISTENER — breath-clock, first testable unit of v3 ============ -->
+  <section class="quick-deck" id="listenerDeck">
+    <div class="deck-card teal-card" style="grid-column: 1 / -1;">
+      <div class="deck-head">
+        <h2>LISTENER · breath-clock</h2>
+        <span class="faint mono">v3 unit 1 — needs http://localhost (Chrome blocks mic on file://)</span>
+      </div>
+      <div class="deck-row">
+        <button id="lsArm" class="teal-btn">arm</button>
+        <select id="lsDevice" title="Audio input — pick the VT-4"><option value="">default input</option></select>
+        <span id="lsState" class="mono faint">silent</span>
+        <div class="ls-meter"><div id="lsMeterFill" class="ls-meter-fill"></div></div>
+        <span id="lsDb" class="mono faint">−∞</span>
+      </div>
+      <div class="deck-row">
+        <label>Thresh</label>
+        <input type="range" id="lsThresh" min="-60" max="-20" value="-42" />
+        <span id="lsThreshVal" class="mono faint">-42dB</span>
+        <label>Breath gap</label>
+        <input type="range" id="lsSilence" min="150" max="1500" step="25" value="450" />
+        <span id="lsSilenceVal" class="mono faint">450ms</span>
+      </div>
+      <div class="deck-row">
+        <label class="ls-toggle"><input type="checkbox" id="lsAdvance" /> breaths advance harmony</label>
+        <span class="faint">phrase → next chord (any mode)</span>
+      </div>
+      <div class="deck-row">
+        <span class="mono">phrases <span id="lsPhrases">0</span></span>
+        <span class="mono">rate <span id="lsRate">0.0</span>/min</span>
+        <button id="lsMisfire" class="warn" title="Press when it advanced on something that was NOT a breath — the falsifier counts">log misfire</button>
+        <span class="mono">misfires <span id="lsMisfires">0</span> (<span id="lsMisRate">0.0</span>/min)</span>
+      </div>
+      <div class="deck-row faint" id="lsNote">falsifier: over 1 misfire/min at rehearsal level kills the mode — registered 2026-08-17</div>
+    </div>
+  </section>
 
   
   <!-- ============ BROWSER SUPPORT BANNER ============ -->
@@ -724,6 +856,8 @@ class MidiEngine {
   constructor() {
     this.access = null;
     this.output = null;
+    // Second output for harmony notes (VT-4 USB). Null = follow the main output.
+    this.harmonyOutput = null;
     // Two independent inputs, kept separate so clock and note streams never
     // interfere: clock comes from the 707, notes come from the Keystep.
     this.clockInput = null;
@@ -785,6 +919,16 @@ class MidiEngine {
     return this.output ? this.output.id : null;
   }
 
+  // --- Harmony output (VT-4 USB) --- second output; falls back to OUT when unset.
+  setHarmonyOutputPort(id) {
+    if (!this.access) return;
+    this.harmonyOutput = id ? this.access.outputs.get(id) || null : null;
+  }
+
+  getHarmonyOutputPortId() {
+    return this.harmonyOutput ? this.harmonyOutput.id : null;
+  }
+
   // --- Clock input (707 USB) — for ClockEngine slave mode ---
   setClockInputPort(id) {
     if (!this.access) return;
@@ -843,10 +987,14 @@ class MidiEngine {
     const ins = this.getInputPorts();
     const roland = /mc-?707|roland/i;
     const arturia = /keystep|arturia/i;
+    const vt4 = /vt-?4/i;
+    const tr6s = /tr-?6s/i;
     const out = (outs.find((p) => roland.test(p.name)) || outs[0] || {}).id || null;
     const clockIn = (ins.find((p) => roland.test(p.name)) || {}).id || null;
     const keysIn = (ins.find((p) => arturia.test(p.name)) || {}).id || null;
-    return { out, clockIn, keysIn };
+    const harmOut = (outs.find((p) => vt4.test(p.name)) || {}).id || null;
+    const auxOut = (outs.find((p) => tr6s.test(p.name) && !/ctrl/i.test(p.name)) || {}).id || null;
+    return { out, clockIn, keysIn, harmOut, auxOut };
   }
 
   // --- Activity flash registration ---
@@ -866,6 +1014,38 @@ class MidiEngine {
     this._flash('out');
     return true;
   }
+
+  // Harmony-path send: dedicated port when set, otherwise the main output.
+  sendHarmony(bytes) {
+    const port = this.harmonyOutput || this.output;
+    if (!port) return false;
+    port.send(bytes);
+    this._flash('out');
+    return true;
+  }
+
+  harmonyNoteOn(ch, note, vel) {
+    this.sendHarmony([NOTE_ON | chNibble(ch), clamp7(note), clamp7(vel)]);
+  }
+
+  harmonyNoteOff(ch, note) {
+    this.sendHarmony([NOTE_OFF | chNibble(ch), clamp7(note), 0]);
+  }
+
+  // --- Generic per-port sends (Quick Deck) ---
+  sendTo(portId, bytes) {
+    if (!this.access || !portId) return false;
+    const port = this.access.outputs.get(portId);
+    if (!port) return false;
+    port.send(bytes);
+    this._flash('out');
+    return true;
+  }
+
+  noteOnTo(portId, ch, note, vel) { this.sendTo(portId, [NOTE_ON | chNibble(ch), clamp7(note), clamp7(vel)]); }
+  noteOffTo(portId, ch, note) { this.sendTo(portId, [NOTE_OFF | chNibble(ch), clamp7(note), 0]); }
+  ccTo(portId, ch, number, value) { this.sendTo(portId, [CONTROL_CHANGE | chNibble(ch), clamp7(number), clamp7(value)]); }
+  pcTo(portId, ch, program) { this.sendTo(portId, [PROGRAM_CHANGE | chNibble(ch), clamp7(program)]); }
 
   noteOn(ch, note, vel) {
     this.send([NOTE_ON | chNibble(ch), clamp7(note), clamp7(vel)]);
@@ -891,10 +1071,16 @@ class MidiEngine {
   // Panic helpers — used on stop, mode switch, port change.
   allNotesOff() {
     for (let ch = 1; ch <= 16; ch++) this.cc(ch, 123, 0);
+    if (this.harmonyOutput && this.harmonyOutput !== this.output) {
+      for (let ch = 1; ch <= 16; ch++) this.sendHarmony([CONTROL_CHANGE | chNibble(ch), 123, 0]);
+    }
   }
 
   allSoundOff() {
     for (let ch = 1; ch <= 16; ch++) this.cc(ch, 120, 0);
+    if (this.harmonyOutput && this.harmonyOutput !== this.output) {
+      for (let ch = 1; ch <= 16; ch++) this.sendHarmony([CONTROL_CHANGE | chNibble(ch), 120, 0]);
+    }
   }
 }
 
@@ -1589,6 +1775,14 @@ class LFOEngine {
     return lfo ? lfo._currentValue : 0;
   }
 
+  // Park every LFO target at its center value. Called on stop/panic so CC
+  // targets are never left wherever the last cycle happened to die.
+  parkAtCenter() {
+    this.lfos.forEach((l) => {
+      this.midi.cc(l.channel, l.ccNumber, clamp7(l.center));
+    });
+  }
+
   getLFOs() {
     return Array.from(this.lfos.values()).map((l) => {
       const c = Object.assign({}, l);
@@ -1926,7 +2120,7 @@ class HarmonyEngine {
 
     if (changed) {
       this._releaseActive();
-      notes.forEach((n) => this.midi.noteOn(this.channel, n, 100));
+      notes.forEach((n) => this.midi.harmonyNoteOn(this.channel, n, 100));
       this._activeNotes = notes;
       this._lastDetected = { root: detected.root, quality: detected.quality };
       this._followChordCallbacks.forEach((cb) =>
@@ -2046,7 +2240,7 @@ class HarmonyEngine {
     this._releaseActive();
 
     const notes = this.computeNotes(step.root, step.quality);
-    notes.forEach((n) => this.midi.noteOn(this.channel, n, 100));
+    notes.forEach((n) => this.midi.harmonyNoteOn(this.channel, n, 100));
     this._activeNotes = notes;
 
     this._barsRemaining = step.bars;
@@ -2060,7 +2254,7 @@ class HarmonyEngine {
   }
 
   _releaseActive() {
-    this._activeNotes.forEach((n) => this.midi.noteOff(this.channel, n));
+    this._activeNotes.forEach((n) => this.midi.harmonyNoteOff(this.channel, n));
     this._activeNotes = [];
   }
 
@@ -2077,11 +2271,137 @@ class HarmonyEngine {
 Object.assign(window, { CHORD_QUALITIES, NOTE_NAMES, chordName, midiNoteName, HarmonyEngine });
 })();
 
+/* ===== listener.js ===== */
+(function(){
+"use strict";
+// listener.js — VoiceListener: Web Audio input analysis for the duet engine.
+// v0 scope: envelope + voiced/silent state machine + phrase-boundary events.
+// A phrase boundary fires on the silence→voice transition after a gap of at
+// least minSilenceMs — the inhale before a line. No browser globals are touched
+// until arm(), so the module imports cleanly anywhere.
+//
+// Falsifier (registered 2026-08-17, before data): if boundary detection
+// misfires more than once a minute on real material at rehearsal level, the
+// breath-clock mode dies. The UI counts so the rehearsal can measure.
+
+class VoiceListener {
+  constructor() {
+    this.ctx = null;
+    this.stream = null;
+    this.analyser = null;
+    this.running = false;
+    // Tunables (UI-exposed)
+    this.thresholdDb = -42;   // enter-voice threshold
+    this.hysteresisDb = 6;    // exit = threshold - hysteresis
+    this.minSilenceMs = 450;  // gap that qualifies as a breath
+    this.exitHoldMs = 120;    // must stay under exit level this long to leave voice
+    // State
+    this._voiced = false;
+    this._lastAbove = 0;
+    this._silenceStart = 0;
+    this._levelCbs = [];
+    this._stateCbs = [];
+    this._phraseCbs = [];
+    this._buf = null;
+    this._timer = null;
+  }
+
+  onLevel(cb) { this._levelCbs.push(cb); }
+  onState(cb) { this._stateCbs.push(cb); }
+  onPhrase(cb) { this._phraseCbs.push(cb); }
+
+  async listDevices() {
+    if (!navigator.mediaDevices) return [];
+    const all = await navigator.mediaDevices.enumerateDevices();
+    return all.filter((d) => d.kind === 'audioinput').map((d) => ({ id: d.deviceId, label: d.label || 'input' }));
+  }
+
+  async arm(deviceId) {
+    if (this.running) this.disarm();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('No mic access here — serve over http://localhost, not file://');
+    }
+    const constraints = {
+      audio: {
+        deviceId: deviceId ? { exact: deviceId } : undefined,
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        channelCount: { ideal: 6 },
+      },
+    };
+    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = this.ctx.createMediaStreamSource(this.stream);
+    this.analyser = this.ctx.createAnalyser();
+    this.analyser.fftSize = 2048;
+    src.connect(this.analyser); // AnalyserNode downmixes to mono — v0 listens to the pair mix
+    this._buf = new Float32Array(this.analyser.fftSize);
+    this.running = true;
+    const now = performance.now();
+    this._voiced = false;
+    this._lastAbove = now;
+    this._silenceStart = now;
+    this._timer = setInterval(() => this._tick(), 25); // 40 Hz analysis
+  }
+
+  disarm() {
+    if (this._timer) clearInterval(this._timer);
+    this._timer = null;
+    if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
+    if (this.ctx) this.ctx.close();
+    this.ctx = null; this.stream = null; this.analyser = null;
+    this.running = false;
+    this._setVoiced(false, performance.now());
+  }
+
+  _rmsDb() {
+    this.analyser.getFloatTimeDomainData(this._buf);
+    let sum = 0;
+    for (let i = 0; i < this._buf.length; i++) sum += this._buf[i] * this._buf[i];
+    const rms = Math.sqrt(sum / this._buf.length);
+    return rms > 0 ? 20 * Math.log10(rms) : -100;
+  }
+
+  _setVoiced(v, t) {
+    if (v === this._voiced) return;
+    this._voiced = v;
+    if (!v) this._silenceStart = t;
+    this._stateCbs.forEach((cb) => cb(v));
+  }
+
+  _tick() {
+    if (!this.running) return;
+    const t = performance.now();
+    const db = this._rmsDb();
+    this._levelCbs.forEach((cb) => cb(db));
+
+    if (db >= this.thresholdDb) {
+      this._lastAbove = t;
+      if (!this._voiced) {
+        const gap = t - this._silenceStart;
+        this._setVoiced(true, t);
+        // Boundary only when the preceding silence was a real breath-gap.
+        if (gap >= this.minSilenceMs) {
+          this._phraseCbs.forEach((cb) => cb({ gapMs: Math.round(gap), at: t }));
+        }
+      }
+    } else if (this._voiced && db < this.thresholdDb - this.hysteresisDb
+               && t - this._lastAbove >= this.exitHoldMs) {
+      this._setVoiced(false, t);
+    }
+  }
+}
+
+Object.assign(window, { VoiceListener });
+})();
+
 /* ===== ui.js (entry) ===== */
 (function(){
 "use strict";
 const { MidiEngine, ClockEngine, EuclideanEngine, LFOEngine, HarmonyEngine, CHORD_QUALITIES, NOTE_NAMES, chordName, midiNoteName } = window;
 // ui.js — wires all modules to the DOM. Owns no musical logic.
+
 
 
 
@@ -2128,6 +2448,8 @@ function saveState() {
       outputPortId: midi.getOutputPortId(),
       clockInputPortId: midi.getClockInputPortId(),
       keyboardInputPortId: midi.getKeyboardInputPortId(),
+      harmonyOutputPortId: midi.getHarmonyOutputPortId(),
+      auxOutputPortId: ($('qTrPort') && $('qTrPort').value) || null,
     },
     euclidean: { voices: euclid.getVoices() },
     lfo: { lfos: lfo.getLFOs() },
@@ -2207,6 +2529,8 @@ function populatePorts() {
   fillPortSelect($('outPort'), outs, midi.getOutputPortId());
   fillPortSelect($('clockInPort'), ins, midi.getClockInputPortId());
   fillPortSelect($('keysInPort'), ins, midi.getKeyboardInputPortId());
+  fillPortSelect($('harmOutPort'), outs, midi.getHarmonyOutputPortId());
+  fillPortSelect($('qTrPort'), outs, ($('qTrPort') && $('qTrPort').value) || null);
 }
 
 async function initMidi() {
@@ -2240,6 +2564,12 @@ function wireTransport() {
   });
   $('keysInPort').addEventListener('change', (e) => {
     midi.setKeyboardInputPort(e.target.value);
+    scheduleSave();
+  });
+  $('harmOutPort').addEventListener('change', (e) => {
+    // Release notes before swapping ports to avoid orphans.
+    panic();
+    midi.setHarmonyOutputPort(e.target.value);
     scheduleSave();
   });
 
@@ -2290,17 +2620,198 @@ function wireTransport() {
   });
 }
 
+// =====================================================================
+//  QUICK DECK — one-click controls for MC-707 / TR-6S / VT-4
+// =====================================================================
+
+let qScene = 1;
+let qKit = 1;
+let qVtHeld = [];
+
+function wireQuickDeck() {
+  // --- MC-707 (main out) ---
+  const open707 = () => { for (let ch = 1; ch <= 8; ch++) { midi.cc(ch, 74, 100); midi.cc(ch, 80, 64); } };
+  $('qOpenAll').addEventListener('click', () => { open707(); setTrackRow(true); });
+  $('qDarkAll').addEventListener('click', () => { for (let ch = 1; ch <= 8; ch++) midi.cc(ch, 74, 30); setTrackRow(false); });
+  $('q707Calm').addEventListener('click', () => { midi.allNotesOff(); midi.allSoundOff(); });
+
+  const sendScene = () => { $('qSceneNum').textContent = qScene; midi.pc(16, qScene - 1); };
+  $('qScenePrev').addEventListener('click', () => { qScene = Math.max(1, qScene - 1); sendScene(); });
+  $('qSceneNext').addEventListener('click', () => { qScene = Math.min(16, qScene + 1); sendScene(); });
+
+  // per-track cutoff toggles: lit = open (CC74=100), unlit = dark (CC74=34)
+  const row = $('qTrackRow');
+  for (let ch = 1; ch <= 8; ch++) {
+    const b = document.createElement('button');
+    b.textContent = ch;
+    b.className = 'trk amber-btn toggle on';
+    b.title = 'Track ' + ch + ' cutoff: lit = open, unlit = dark';
+    b.addEventListener('click', () => {
+      const on = !b.classList.contains('on');
+      b.classList.toggle('on', on);
+      midi.cc(ch, 74, on ? 100 : 34);
+    });
+    row.appendChild(b);
+  }
+  function setTrackRow(on) {
+    row.querySelectorAll('button').forEach((b) => b.classList.toggle('on', on));
+  }
+
+  // --- TR-6S (own port select) ---
+  const trCh = $('qTrCh');
+  for (let c = 1; c <= 16; c++) {
+    const o = document.createElement('option');
+    o.value = c; o.textContent = 'ch' + c;
+    if (c === 10) o.selected = true;
+    trCh.appendChild(o);
+  }
+  $('qTrPort').addEventListener('change', scheduleSave);
+  trCh.addEventListener('change', scheduleSave);
+  const trPort = () => $('qTrPort').value;
+  const trChan = () => parseInt(trCh.value, 10) || 10;
+
+  // official TR-6S note map (Roland PDF): BD36 SD38 LT43 HC39 CH42 OH46
+  const PADS = [['BD', 36], ['SD', 38], ['LT', 43], ['HC', 39], ['CH', 42], ['OH', 46]];
+  const padRow = $('qPadRow');
+  PADS.forEach(([name, note]) => {
+    const b = document.createElement('button');
+    b.textContent = name;
+    b.className = 'pad';
+    b.title = name + ' — note ' + note;
+    b.addEventListener('mousedown', () => {
+      midi.noteOnTo(trPort(), trChan(), note, 112);
+      setTimeout(() => midi.noteOffTo(trPort(), trChan(), note), 120);
+    });
+    padRow.appendChild(b);
+  });
+
+  const sendKit = () => { $('qKitNum').textContent = qKit; midi.pcTo(trPort(), trChan(), qKit - 1); };
+  $('qKitPrev').addEventListener('click', () => { qKit = Math.max(1, qKit - 1); sendKit(); });
+  $('qKitNext').addEventListener('click', () => { qKit = Math.min(128, qKit + 1); sendKit(); });
+
+  // --- VT-4 (harmony path: dedicated port when set, else main out) ---
+  const cloneOpts = () => {
+    if ($('stepRoot').options.length && !$('qVtRoot').options.length) {
+      $('qVtRoot').innerHTML = $('stepRoot').innerHTML;
+      $('qVtQual').innerHTML = $('stepQuality').innerHTML;
+    }
+  };
+  cloneOpts();
+  setTimeout(cloneOpts, 400); // harmony UI may populate after us
+
+  const vtRelease = () => { qVtHeld.forEach((n) => midi.harmonyNoteOff(harmony.channel, n)); qVtHeld = []; };
+  $('qVtSend').addEventListener('click', () => {
+    cloneOpts();
+    vtRelease();
+    const notes = harmony.computeNotes($('qVtRoot').value, $('qVtQual').value);
+    notes.forEach((n) => midi.harmonyNoteOn(harmony.channel, n, 100));
+    qVtHeld = notes;
+  });
+  $('qVtClear').addEventListener('click', vtRelease);
+
+  const vtPort = () => midi.getHarmonyOutputPortId() || midi.getOutputPortId();
+  const scen = $('qVtScenes');
+  for (let s = 1; s <= 8; s++) {
+    const b = document.createElement('button');
+    b.textContent = s;
+    b.className = 'teal-btn';
+    b.title = 'VT-4 scene ' + s + ' via PC — unconfirmed, verify once on the box';
+    b.addEventListener('click', () => midi.pcTo(vtPort(), harmony.channel, s - 1));
+    scen.appendChild(b);
+  }
+}
+
+// =====================================================================
+//  LISTENER — breath-clock (v3 unit 1)
+// =====================================================================
+
+const listener = new VoiceListener();
+let lsPhrases = 0;
+let lsMisfires = 0;
+let lsArmedAt = 0;
+
+function wireListener() {
+  const fmt = (n) => n.toFixed(1);
+  const mins = () => Math.max((performance.now() - lsArmedAt) / 60000, 1 / 60);
+
+  listener.onLevel((db) => {
+    const pct = Math.max(0, Math.min(100, (db + 60) / 40 * 100));
+    $('lsMeterFill').style.width = pct + '%';
+    $('lsDb').textContent = db <= -99 ? '−∞' : Math.round(db) + 'dB';
+  });
+  listener.onState((v) => {
+    $('lsState').textContent = v ? 'VOICE' : 'silent';
+    $('lsState').classList.toggle('voiced', v);
+  });
+  listener.onPhrase((p) => {
+    lsPhrases += 1;
+    $('lsPhrases').textContent = lsPhrases;
+    $('lsRate').textContent = fmt(lsPhrases / mins());
+    if ($('lsAdvance').checked) {
+      harmony.jumpToStep(harmony._stepIndex + 1);
+    }
+  });
+
+  $('lsArm').addEventListener('click', async () => {
+    if (listener.running) {
+      listener.disarm();
+      $('lsArm').textContent = 'arm';
+      $('lsArm').classList.remove('on');
+      return;
+    }
+    try {
+      await listener.arm($('lsDevice').value || undefined);
+      lsArmedAt = performance.now();
+      lsPhrases = 0; lsMisfires = 0;
+      $('lsPhrases').textContent = '0'; $('lsMisfires').textContent = '0';
+      $('lsArm').textContent = 'disarm';
+      $('lsArm').classList.add('on');
+      $('lsNote').textContent = 'armed — falsifier: over 1 misfire/min at rehearsal level kills the mode';
+      // Labels appear only after permission; refresh and prefer the VT-4.
+      const devs = await listener.listDevices();
+      const sel = $('lsDevice');
+      const keep = sel.value;
+      sel.innerHTML = '<option value="">default input</option>';
+      devs.forEach((d) => {
+        const o = document.createElement('option');
+        o.value = d.id; o.textContent = d.label;
+        sel.appendChild(o);
+      });
+      const vt = devs.find((d) => /vt-?4/i.test(d.label));
+      sel.value = keep || (vt ? vt.id : '');
+    } catch (err) {
+      $('lsNote').textContent = 'arm failed: ' + err.message;
+    }
+  });
+
+  $('lsThresh').addEventListener('input', (e) => {
+    listener.thresholdDb = parseInt(e.target.value, 10);
+    $('lsThreshVal').textContent = e.target.value + 'dB';
+  });
+  $('lsSilence').addEventListener('input', (e) => {
+    listener.minSilenceMs = parseInt(e.target.value, 10);
+    $('lsSilenceVal').textContent = e.target.value + 'ms';
+  });
+  $('lsMisfire').addEventListener('click', () => {
+    lsMisfires += 1;
+    $('lsMisfires').textContent = lsMisfires;
+    $('lsMisRate').textContent = fmt(lsMisfires / mins());
+  });
+}
+
 function stopAll() {
   clock.stop();
   if (clock.mode === 'internal') midi.rt(0xfc);
   euclid.releaseAll();
   harmony.stopProgression();
+  lfo.parkAtCenter();
   midi.allNotesOff();
 }
 
 function panic() {
   euclid.releaseAll();
   harmony.releaseAll();
+  lfo.parkAtCenter();
   midi.allNotesOff();
   midi.allSoundOff();
 }
@@ -2980,6 +3491,8 @@ async function boot() {
   const state = loadState();
 
   wireTransport();
+  wireQuickDeck();
+  wireListener();
   wireHarmony();
 
   if (state) {
@@ -3037,9 +3550,13 @@ async function boot() {
     const outId = sm.outputPortId || guess.out;
     const clkId = sm.clockInputPortId || guess.clockIn;
     const keysId = sm.keyboardInputPortId || guess.keysIn;
+    const harmId = sm.harmonyOutputPortId || guess.harmOut;
+    const auxId = sm.auxOutputPortId || guess.auxOut;
     if (outId) { midi.setOutputPort(outId); $('outPort').value = outId; }
     if (clkId) { midi.setClockInputPort(clkId); $('clockInPort').value = clkId; }
     if (keysId) { midi.setKeyboardInputPort(keysId); $('keysInPort').value = keysId; }
+    if (harmId) { midi.setHarmonyOutputPort(harmId); $('harmOutPort').value = harmId; }
+    if (auxId) { $('qTrPort').value = auxId; }
   }
 
   // Slave-mode disables BPM input.
